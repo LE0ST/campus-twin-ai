@@ -1,13 +1,19 @@
 import { useEffect, useState } from 'react'
 import { serverTimeAt } from './catalogLifetime'
 
-// Recheck expiry even when polling stalls.
+// Keep the clock reading in state: rendering must remain pure.
 export default function useServerTime(clock) {
-  const [, tick] = useState(0)
+  const [monotonicNow, setMonotonicNow] = useState(null)
   useEffect(() => {
     if (!clock) return
-    const timer = window.setInterval(() => tick((value) => value + 1), 250)
-    return () => window.clearInterval(timer)
+    const update = () => setMonotonicNow(performance.now())
+    const firstTick = window.setTimeout(update, 0)
+    const interval = window.setInterval(update, 250)
+    return () => {
+      window.clearTimeout(firstTick)
+      window.clearInterval(interval)
+    }
   }, [clock])
-  return serverTimeAt(clock, performance.now())
+  // Unknown until the effect supplies a fresh reading; never grant stale data validity.
+  return serverTimeAt(clock, monotonicNow)
 }
