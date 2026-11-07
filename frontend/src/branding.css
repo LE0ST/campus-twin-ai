@@ -1,0 +1,104 @@
+/* Identidad visual y movimiento. Sin cambios a datos, navegación o reservas. */
+.sidebar {
+  background: radial-gradient(ellipse at 0 0, #1a3c47 0, transparent 45%), #122033;
+  border-right: 1px solid #20384b;
+}
+.sidebar-brand { padding-top: 3px; }
+.brand-mark { box-shadow: 0 4px 18px #07967b22; }
+.sidebar-bottom { margin-top: auto; padding-top: 30px; }
+.team-signature {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 15px 7px 18px;
+  overflow: hidden;
+  border-top: 1px solid #ffffff12;
+}
+.team-signature > img { object-fit: contain; flex-shrink: 0; animation: brand-arrival 600ms cubic-bezier(.2,.8,.2,1) backwards; }
+.team-signature > div { min-width: 0; }
+.team-eyebrow { display: block; font-size: 7px; color: #a1b7c8; letter-spacing: 1.1px; margin-bottom: 6px; }
+.team-signature strong { display: block; font-size: 16px; color: #effbf7; letter-spacing: -.35px; }
+.team-caption { display: block; font-size: 9px; color: #9db7c5; margin-top: 5px; }
+.sidebar-note { margin-top: 0; background: #ffffff05; border-color: #ffffff0d; box-shadow: inset 0 1px #ffffff04; }
+.demo-badge { background: #2d796f38; color: #a7e9d6; border: 1px solid #62d5b91a; }
+.sidebar-status-dot { background: #8aabbc; }
+.topbar { min-height: 84px; box-shadow: 0 3px 18px #233c5503; }
+.topbar-actions { gap: 17px; }
+.header-badge { margin-right: 0; border: 1px solid #d4eee3; background: #edf9f3; }
+.university-brand { display: flex; align-items: center; justify-content: center; padding: 6px 11px; background: #122033; border: 1px solid #263c51; border-radius: 9px; flex-shrink: 0; }
+.university-brand img { display: block; width: 151px; height: 40px; object-fit: contain; }
+.header-team { display: flex; align-items: center; gap: 9px; padding-left: 15px; border-left: 1px solid #e3ebf0; }
+.team-avatar { width: 38px; height: 38px; background: #edf7f4; border: 1px solid #dcedea; border-radius: 11px; }
+.team-avatar img { display: block; width: 34px; height: 34px; object-fit: contain; }
+.team-name { font-size: 12px; letter-spacing: -.1px; }
+.team-name small { display: block; margin-top: 4px; font-size: 9px; font-weight: 400; color: #60768a; letter-spacing: .1px; }
+.workspace { background: linear-gradient(140deg, #f3f8fa 0%, #f5f8fc 65%, #f2f8f6 100%); }
+.intro h1 { letter-spacing: -.9px; }
+.summary-card,.control-panel,.assistant-card { box-shadow: 0 3px 12px #233d5403; }
+.summary-card { border-top: 2px solid #e4edf2; transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease; }
+.summary-card:nth-child(1) { border-top-color: #d8e5ff; }
+.summary-card:nth-child(2) { border-top-color: #ccece0; }
+.summary-card:nth-child(3) { border-top-color: #f2e5c7; }
+.summary-card:hover { transform: translateY(-3px); box-shadow: 0 9px 23px #233d540b; }
+.summary-icon { box-shadow: inset 0 0 0 1px #ffffff8c; }
+.summary-grid > .summary-card { animation: surface-arrival 450ms cubic-bezier(.2,.75,.25,1) backwards; }
+.summary-grid > .summary-card:nth-child(2) { animation-delay: 55ms; }
+.summary-grid > .summary-card:nth-child(3) { animation-delay: 110ms; }
+.panel-grid,.occupancy-grid,.search-results { animation: surface-arrival 380ms cubic-bezier(.2,.75,.25,1) backwards; }
+.floor-plan { background-color: #f5f8fc; background-image: radial-gradient(#a6bdce28 .7px, transparent .7px); background-size: 13px 13px; }
+.map-room { box-shadow: 0 2px 5px #234b4404; transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background-color 180ms ease; }
+.map-room:hover { transform: translateY(-2px); box-shadow: 0 6px 13px #264f5520; }
+.map-room:active { transform: translateY(0); }
+.map-room.selected { box-shadow: 0 0 0 1px #4479ed, 0 4px 12px #3463a70e; }
+.navigation-link { transition: color 180ms ease, background-color 180ms ease, box-shadow 180ms ease; }
+.navigation-link svg { transition: transform 180ms ease, color 180ms ease; }
+.navigation-link:hover svg { transform: translateX(2px); }
+.navigation-link.active { background: linear-gradient(100deg, #1c3c48, #1b3045); }
+.primary-button { box-shadow: 0 3px 8px #07846d15; transition: transform 180ms ease, background-color 180ms ease, box-shadow 180ms ease; }
+.primary-button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 13px #07846d25; }
+.primary-button:active:not(:disabled) { transform: translateY(0); box-shadow: 0 1px 4px #07846d15; }
+.primary-button:disabled { box-shadow: none; }
+.primary-button > span { transition: transform 180ms ease; }
+.primary-button:hover:not(:disabled) > span { transform: translateX(3px); }
+.input-label input,.input-label select,.filters input,.filters select,.assistant-card textarea { transition: border-color 180ms ease, box-shadow 180ms ease; }
+.input-label input:hover,.input-label select:hover,.filters input:hover,.filters select:hover,.assistant-card textarea:hover { border-color: #b3c6cf; }
+.input-label input:focus,.input-label select:focus,.filters input:focus,.filters select:focus,.assistant-card textarea:focus { border-color: #48a18b; box-shadow: 0 0 0 3px #48a18b10; }
+.catalog-feedback[role="status"] { background-image: linear-gradient(105deg, transparent 20%, #ffffffa6 45%, transparent 70%); background-size: 220% 100%; animation: loading-sheen 1.8s ease-in-out infinite; }
+.status { animation: surface-arrival 220ms ease-out backwards; }
+.footer-team { display: inline-flex; align-items: center; gap: 7px; }
+.footer-team img { object-fit: contain; }
+.workspace-footer { align-items: center; }
+@keyframes surface-arrival { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes brand-arrival { from { opacity: 0; transform: translateY(4px) scale(.94); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes loading-sheen { from { background-position: 110% 0; } to { background-position: -110% 0; } }
+@media(max-width:1150px) {
+  .header-badge { display: none; }
+  .topbar-actions { gap: 12px; }
+  .university-brand img { width: 136px; height: 36px; }
+  .team-signature { gap: 4px; padding-left: 0; padding-right: 0; }
+  .team-signature strong { font-size: 15px; }
+}
+@media(max-width:800px) {
+  .header-team { padding-left: 10px; }
+  .university-brand { padding: 5px 8px; }
+  .university-brand img { width: 125px; height: 33px; }
+}
+@media(max-width:640px) {
+  .sidebar { padding-top: 20px; }
+  .sidebar-bottom { display: none; }
+  .topbar { min-height: 74px; padding-inline: 16px; gap: 9px; }
+  .topbar-actions { gap: 8px; }
+  .workspace-label { gap: 6px; font-size: 11px; }
+  .workspace-label > span { display: none; }
+  .header-team { padding-left: 8px; }
+  .team-avatar { width: 32px; height: 32px; border-radius: 9px; }
+  .team-avatar img { width: 29px; height: 29px; }
+  .university-brand img { width: 115px; height: 31px; }
+  .navigation-link:hover svg { transform: none; }
+  .summary-card:hover { transform: none; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .sidebar *,.workspace * { animation: none !important; transition: none !important; }
+  .map-room:hover,.summary-card:hover,.primary-button:hover:not(:disabled) { transform: none; }
+}
