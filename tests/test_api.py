@@ -14,7 +14,7 @@ from backend import main
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(main, "DB_PATH", tmp_path / "test.sqlite")
     monkeypatch.setenv("VISION_INGEST_TOKEN", "test-ingest-token")
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
     with TestClient(main.app) as test_client:
         yield test_client
 
@@ -103,3 +103,46 @@ def test_telemetry_rejects_boolean_count(client):
     response = client.post("/api/telemetry", json=payload,
                            headers={"Authorization": "Bearer test-ingest-token"})
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize("mode,status,count,state,reason", [
+    ("live_camera", "ok", 0, "no_detections", None),
+    ("live_camera", "ok", 3, "people_detected", None),
+    ("live_camera", "error", None, "unknown", "camera_error"),
+    ("authorized_clip", "ok", 2, "unknown", "recorded_sample"),
+])
+def test_consumer_contract_keeps_physical_and_booking_states_separate(
+        client, mode, status, count, state, reason):
+    booking = reservation_payload()
+    assert client.post("/api/reservations", json=booking).status_code == 201
+    sample = {"source_id": "vision-david", "room_id": "R01", "mode": mode,
+              "status": status, "count": count,
+              "observed_at": datetime.now(timezone.utc).isoformat()}
+    assert client.post("/api/telemetry", json=sample,
+        headers={"Authorization": "Bearer test-ingest-token"}).status_code == 202
+    catalog = client.get("/api/rooms", params={"date": booking["date"],
+        "slot_id": booking["slot_id"]}).json()
+    assert catalog["api_version"] == "1.0"
+    assert len(catalog["slots"]) == 8
+    room = catalog["rooms"][0]
+    assert room["reservation_state"] == "reserved" and room["bookable"] is False
+    assert room["occupancy"]["state"] == state
+    assert room["occupancy"]["reason"] == reason
+    if state == "unknown":
+        assert room["occupancy"]["count"] is None
+    if mode == "authorized_clip":
+        assert room["recorded_sample"]["detected_count"] == count
+
+
+def test_stale_telemetry_remains_unknown(client, monkeypatch):
+    received = datetime.now(timezone.utc)
+    sample = {"source_id": "vision-david", "room_id": "R01", "mode": "live_camera",
+              "status": "ok", "count": 3, "observed_at": received.isoformat()}
+    assert client.post("/api/telemetry", json=sample,
+        headers={"Authorization": "Bearer test-ingest-token"}).status_code == 202
+    monkeypatch.setattr(main, "now_utc", lambda: received + timedelta(seconds=16))
+    day, slot_id = future_slot()
+    room = client.get("/api/rooms", params={"date": day, "slot_id": slot_id}).json()["rooms"][0]
+    assert room["occupancy"]["state"] == "unknown"
+    assert room["occupancy"]["reason"] == "stale"
+    assert room["occupancy"]["count"] is None

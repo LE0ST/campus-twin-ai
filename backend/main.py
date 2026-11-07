@@ -23,7 +23,7 @@ if not DB_PATH.is_absolute():
     DB_PATH = ROOT / DB_PATH
 LIMA = ZoneInfo("America/Lima")
 UTC = timezone.utc
-MODEL_ID = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+from backend import deepseek
 SLOTS: dict[str, tuple[time, time]] = {
     "S09": (time(9), time(10)), "S10": (time(10), time(11)),
     "S11": (time(11), time(12)), "S14": (time(14), time(15)),
@@ -278,7 +278,8 @@ def health():
     except sqlite3.Error as exc:
         raise APIError(503, "database_unavailable", "La base no está disponible.") from exc
     return {"status": "ok", "api_version": "1.0", "server_time": now_utc().isoformat().replace("+00:00", "Z"),
-        "timezone": "America/Lima", "llm_configured": bool(os.getenv("GEMINI_API_KEY"))}
+        "timezone": "America/Lima", "llm_configured": bool(os.getenv("DEEPSEEK_API_KEY")),
+        "llm_provider": "deepseek", "llm_model": os.getenv("DEEPSEEK_MODEL", deepseek.DEFAULT_MODEL)}
 
 
 @app.get("/api/rooms")
@@ -396,10 +397,31 @@ def create_reservation(payload: ReservationIn):
         raise APIError(503, "database_unavailable", "No se pudo guardar la reserva.") from exc
 
 
+class SearchArgs(StrictModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    date: str
+    slot_id: str
+    attendees: int = Field(ge=1, le=100)
+    required_equipment: list[str]
+
+
+class ProposalArgs(SearchArgs):
+    room_id: str
+
+
+SEARCH_SCHEMA = {"type": "object", "additionalProperties": False,
+    "properties": {"date": {"type": "string"}, "slot_id": {"type": "string"},
+        "attendees": {"type": "integer"}, "required_equipment": {
+            "type": "array", "items": {"type": "string", "enum": sorted(EQUIPMENT)}}},
+    "required": ["date", "slot_id", "attendees", "required_equipment"]}
+PROPOSAL_SCHEMA = {**SEARCH_SCHEMA,
+    "properties": {**SEARCH_SCHEMA["properties"], "room_id": {"type": "string", "enum": sorted(ROOM_IDS)}},
+    "required": [*SEARCH_SCHEMA["required"], "room_id"]}
+
+
 @app.post("/api/assistant/propose")
 def propose(payload: AssistantIn):
-    key = os.getenv("GEMINI_API_KEY")
-    if not key:
+    if not os.getenv("DEEPSEEK_API_KEY"):
         raise APIError(503, "assistant_unavailable", "Asistente sin configurar; usa el formulario.")
     match = re.search(r"(?<!\d)(\d{1,3})(?!\d)", payload.text)
     if not match:
@@ -407,60 +429,32 @@ def propose(payload: AssistantIn):
                 "proposal": None, "tool_trace": []}
     attendees = int(match.group(1))
     try:
-        from google import genai
-        from google.genai import types
-
-        client = genai.Client(api_key=key, http_options=types.HttpOptions(timeout=6500))
-        search_tool = {"name": "search_rooms", "description": "Busca salas compatibles; no escribe reservas.",
-            "parameters": {"type": "OBJECT", "properties": {
-                "date": {"type": "STRING"}, "slot_id": {"type": "STRING"},
-                "attendees": {"type": "INTEGER"},
-                "required_equipment": {"type": "ARRAY", "items": {"type": "STRING"}}},
-                "required": ["date", "slot_id", "attendees", "required_equipment"]}}
-        first = client.models.generate_content(model=MODEL_ID,
-            contents=f"Solicitud literal: {payload.text}\nFecha seleccionada: {payload.date}\nFranja seleccionada: {payload.slot_id}\nAsistentes identificados: {attendees}. No inventes requisitos.",
-            config=types.GenerateContentConfig(tools=[types.Tool(function_declarations=[search_tool])],
-                tool_config=types.ToolConfig(function_calling_config=types.FunctionCallingConfig(
-                    mode="ANY", allowed_function_names=["search_rooms"])),
-                automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)))
-        calls = [part.function_call for c in (first.candidates or []) for part in (c.content.parts or []) if part.function_call]
-        if not calls or calls[0].name != "search_rooms":
-            raise ValueError("search_rooms no fue solicitado")
-        args = dict(calls[0].args or {})
-        if args.get("date") != payload.date or args.get("slot_id") != payload.slot_id or args.get("attendees") != attendees:
-            return {"status": "needs_clarification", "message": "Confirma fecha, franja y asistentes.",
-                    "proposal": None, "tool_trace": ["search_rooms"]}
-        required = args.get("required_equipment", [])
-        if not isinstance(required, list) or any(item not in EQUIPMENT for item in required):
-            return {"status": "needs_clarification", "message": "Aclara el equipamiento que necesitas.",
-                    "proposal": None, "tool_trace": ["search_rooms"]}
+        raw = deepseek.call_tool("search_rooms", SEARCH_SCHEMA,
+            f"Solicitud: {payload.text}\nFecha: {payload.date}; franja: {payload.slot_id}; asistentes: {attendees}. "
+            "Equipos permitidos: pc, projector, whiteboard, wifi. No inventes requisitos.")
+        search = SearchArgs.model_validate(raw)
+        required = search.required_equipment
+        if (search.date != payload.date or search.slot_id != payload.slot_id
+                or search.attendees != attendees or len(required) != len(set(required))
+                or not set(required).issubset(EQUIPMENT)):
+            raise ValueError("invalid search")
         candidates = room_candidates(payload.date, payload.slot_id, attendees, required)
         if not candidates:
             return {"status": "no_match", "message": "No hay una sala compatible para esa franja.",
                     "proposal": None, "tool_trace": ["search_rooms"]}
-        proposal_tool = {"name": "propose_reservation", "description": "Selecciona una candidata validada; no reserva.",
-            "parameters": {"type": "OBJECT", "properties": {
-                "room_id": {"type": "STRING"}, "date": {"type": "STRING"},
-                "slot_id": {"type": "STRING"}, "attendees": {"type": "INTEGER"},
-                "required_equipment": {"type": "ARRAY", "items": {"type": "STRING"}}},
-                "required": ["room_id", "date", "slot_id", "attendees", "required_equipment"]}}
-        second = client.models.generate_content(model=MODEL_ID,
-            contents=f"Solicitud: {payload.text}\nCandidatas validadas por el servidor: {json.dumps(candidates)}\nCopia exactamente una candidata.",
-            config=types.GenerateContentConfig(tools=[types.Tool(function_declarations=[proposal_tool])],
-                tool_config=types.ToolConfig(function_calling_config=types.FunctionCallingConfig(
-                    mode="ANY", allowed_function_names=["propose_reservation"])),
-                automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)))
-        calls2 = [part.function_call for c in (second.candidates or []) for part in (c.content.parts or []) if part.function_call]
-        if len(calls2) != 1 or calls2[0].name != "propose_reservation":
-            raise ValueError("propose_reservation no fue solicitado")
-        selected = dict(calls2[0].args or {})
-        chosen = next((item for item in candidates if item == selected), None)
-        if chosen is None:
-            raise ValueError("La propuesta no coincide con candidatas")
-        return {"status": "proposed", "message": "Opción compatible. Revisa y confirma.",
-                "proposal": chosen, "tool_trace": ["search_rooms", "propose_reservation"]}
-    except Exception as exc:
-        raise APIError(503, "assistant_unavailable", "No se pudo consultar Gemini; usa el formulario.") from exc
+        raw_proposal = deepseek.call_tool("propose_reservation", PROPOSAL_SCHEMA,
+            "Selecciona y copia exactamente una candidata validada: " + json.dumps(candidates))
+        selected = ProposalArgs.model_validate(raw_proposal).model_dump()
+        if selected not in candidates:
+            raise ValueError("invalid proposal")
+        # Revalidate availability after the provider call; proposals never write reservations.
+        if selected not in room_candidates(payload.date, payload.slot_id, attendees, required):
+            return {"status": "no_match", "message": "La sala ya no está disponible; consulta de nuevo.",
+                    "proposal": None, "tool_trace": ["search_rooms", "propose_reservation"]}
+        return {"status": "proposed", "message": "Opción compatible con los asistentes y equipos solicitados. Revisa y confirma.",
+                "proposal": selected, "tool_trace": ["search_rooms", "propose_reservation"]}
+    except Exception:
+        raise APIError(503, "assistant_unavailable", "No se pudo consultar DeepSeek; usa el formulario.") from None
 
 
 @app.post("/api/telemetry", status_code=202)
