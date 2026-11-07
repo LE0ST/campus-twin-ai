@@ -1,22 +1,20 @@
+# Existing public demo runs on Render Free; no persistent disk or paid resources.
+# This blueprint is a reference. Do not create a second service by applying it.
 services:
   - type: web
-    name: campustwin-ai
+    name: campustwin-ai-demo
     runtime: docker
-    branch: codex/campustwin-render-infra
+    branch: main
     region: ohio
-    plan: starter
+    plan: free
     numInstances: 1
     autoDeployTrigger: 'off'
     healthCheckPath: /api/health
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    disk:
-      name: campustwin-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: CAMPUSTWIN_DB
-        value: /var/data/campustwin.db
+        value: /tmp/campustwin-demo.db
       - key: DEEPSEEK_MODEL
         value: deepseek-flash
       - key: DEEPSEEK_API_KEY
