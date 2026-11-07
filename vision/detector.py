@@ -39,12 +39,12 @@ class PersonDetector:
                 logger.error(f"Error fatal inicializando detector YOLO en CPU: {e}")
                 raise
 
-    def count_persons(self, frame: np.ndarray) -> Tuple[int, float]:
+    def count_persons(self, frame: np.ndarray, return_annotated: bool = False) -> Tuple[int, float, Optional[np.ndarray]]:
         """
         Ejecuta inferencia exclusivamente sobre clase 0 (person).
-        Retorna (count: int, latency_ms: float).
+        Retorna (count: int, latency_ms: float, annotated_frame: Optional[np.ndarray]).
         count está estrictamente acotado en [0, 100].
-        No guarda imágenes ni realiza biometría.
+        No guarda imágenes en disco ni realiza biometría.
         """
         if self.model is None or frame is None:
             raise RuntimeError("Modelo no cargado o frame inválido")
@@ -64,7 +64,7 @@ class PersonDetector:
         latency_ms = (time.perf_counter() - t_start) * 1000.0
 
         if not results or len(results) == 0:
-            return 0, latency_ms
+            return 0, latency_ms, frame if return_annotated else None
 
         boxes = results[0].boxes
         raw_count = len(boxes) if boxes is not None else 0
@@ -72,4 +72,6 @@ class PersonDetector:
         # Límite de integridad contractual: entero en [0, 100]
         final_count = min(max(int(raw_count), 0), 100)
 
-        return final_count, latency_ms
+        annotated_frame = results[0].plot() if return_annotated else None
+
+        return final_count, latency_ms, annotated_frame

@@ -4,6 +4,7 @@ import signal
 import sys
 import time
 from datetime import datetime, timezone
+import cv2
 
 # Asegurar que la carpeta vision/ esté en sys.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -96,7 +97,7 @@ def run_pipeline():
                 )
             else:
                 try:
-                    count, lat_ms = detector.count_persons(frame)
+                    count, lat_ms, annotated = detector.count_persons(frame, return_annotated=config.show)
                     logger.info(
                         f"[FRAME] count={count} personas detectadas | latencia={lat_ms:.1f} ms | observed_at={observed_at}"
                     )
@@ -106,6 +107,22 @@ def run_pipeline():
                         count=count,
                         observed_at=observed_at,
                     )
+
+                    # Si se activó la bandera --show, mostrar ventana de monitor local
+                    if config.show and annotated is not None:
+                        cv2.putText(
+                            annotated,
+                            f"CampusTwin R01 | Count: {count} | Lat: {lat_ms:.1f}ms",
+                            (15, 30),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.7,
+                            (0, 255, 0),
+                            2,
+                        )
+                        cv2.imshow("CampusTwin AI - Monitor de Vision (Local)", annotated)
+                        if cv2.waitKey(1) & 0xFF == ord("q"):
+                            _running = False
+                            break
                 except Exception as e:
                     logger.error(f"Error durante inferencia: {e}. Emitiendo status=error...")
                     err_time = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -120,15 +137,21 @@ def run_pipeline():
             elapsed = time.perf_counter() - tick_start
             sleep_time = max(0.0, config.cadence_seconds - elapsed)
 
-            # Dormir en micro-intervalos para responder rápido a Ctrl+C
-            sleep_step = 0.1
+            # Dormir en micro-intervalos para responder rápido a Ctrl+C y eventos de GUI
+            sleep_step = 0.05
             while _running and sleep_time > 0:
+                if config.show:
+                    if cv2.waitKey(1) & 0xFF == ord("q"):
+                        _running = False
+                        break
                 time.sleep(min(sleep_step, sleep_time))
                 sleep_time -= sleep_step
 
     finally:
         logger.info("Cerrando recursos de visión...")
         video.release()
+        if config.show:
+            cv2.destroyAllWindows()
         logger.info("Módulo de visión finalizado de forma limpia.")
 
 

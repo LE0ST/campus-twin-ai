@@ -95,7 +95,25 @@ def test_integration(token: str, backend_url: str = "http://10.96.239.62:8000"):
         print(f"   [ERROR] Error consultando /api/rooms: {e}")
         return False
 
+def _load_env_fallback():
+    root_env = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+    if os.path.exists(root_env):
+        try:
+            with open(root_env, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        k = k.strip()
+                        v = v.strip().strip('"').strip("'")
+                        if k and k not in os.environ:
+                            os.environ[k] = v
+        except Exception:
+            pass
+
+
 if __name__ == "__main__":
+    _load_env_fallback()
     tok = os.environ.get("VISION_INGEST_TOKEN", "").strip()
     if len(sys.argv) > 1:
         tok = sys.argv[1].strip()

@@ -18,9 +18,29 @@ class VisionConfig:
     cadence_seconds: float = 3.0
     imgsz: int = 640
     conf_threshold: float = 0.35
+    show: bool = False
+
+
+def _load_env_fallback():
+    # Cargar .env de la raíz del proyecto si no está ya en el entorno
+    root_env = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+    if os.path.exists(root_env):
+        try:
+            with open(root_env, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        k = k.strip()
+                        v = v.strip().strip('"').strip("'")
+                        if k and k not in os.environ:
+                            os.environ[k] = v
+        except Exception:
+            pass
 
 
 def parse_args() -> VisionConfig:
+    _load_env_fallback()
     parser = argparse.ArgumentParser(description="CampusTwin AI - Módulo de Visión (David Yalle)")
     parser.add_argument(
         "--backend",
@@ -76,6 +96,11 @@ def parse_args() -> VisionConfig:
         default=0.35,
         help="Umbral de confianza para clase persona",
     )
+    parser.add_argument(
+        "--show",
+        action="store_true",
+        help="Muestra ventana visual local con las detecciones de la cámara (para monitoreo y demo)",
+    )
 
     args = parser.parse_args()
 
@@ -95,4 +120,5 @@ def parse_args() -> VisionConfig:
         cadence_seconds=args.cadence,
         imgsz=args.imgsz,
         conf_threshold=args.conf,
+        show=args.show,
     )
