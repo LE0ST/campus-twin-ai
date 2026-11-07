@@ -97,4 +97,4 @@ Leonardo confirmó adicionalmente la visualización independiente de «Reservada
 
 Reejecutados npm.cmd test (11/11 PASS), npm.cmd run build y npm.cmd run lint para este cierre. El cambio de cierre solo actualiza este informe; mantiene el código y las 11 pruebas del commit de36bf2. No añade funcionalidades ni cambia el backend, el contrato API o el perfil de demostración.
 
-T28/T30 verifican el flujo con consultas periódicas activas. No certifican T31/T53: siguen pendientes la caducidad independiente cuando se bloquea el polling y la invalidación inmediata al volver de una pestaña suspendida. El tiempo utilizado por la presentación se actualiza con cada respuesta del catálogo; no hay un temporizador monotónico independiente ni un manejador visibilitychange. Esta limitación debe mantenerse visible en la revisión de estabilidad.
+En el commit de aquel cierre, T28/T30 no certificaban T31/T53: el frontend aún carecía de caducidad independiente e invalidación de pestaña. Para los cambios locales posteriores, sus pruebas y límites, consultar [GUIA_DEMO_REVISION.md](GUIA_DEMO_REVISION.md).
