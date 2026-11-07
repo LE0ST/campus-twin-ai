@@ -60,8 +60,8 @@ export default function DashboardLayout({ children, activeView, profile, onProfi
         </div>
       </header>
       <div className={`profile-bar ${isAdmin ? 'admin-profile' : ''}`}>
-        <div><span className="profile-view-label">{isAdmin ? 'Vista de Secretaría' : 'Vista de usuario'}</span><span className="profile-scope">Perfil de demostración</span></div>
-        <label>Cambiar perfil<select aria-label="Perfil de demostración" value={profile} disabled={busy} onChange={(event) => onProfileChange(event.target.value)}><option value="user">Usuario común</option><option value="admin">Secretaría / Administrador</option><option value="choose">Elegir de nuevo…</option></select></label>
+        <div><span className="profile-view-label">{isAdmin ? 'Vista de Secretaría' : 'Vista de usuario'}</span><span className="profile-scope">Perfil de demostración</span><small className="profile-notice" id="profile-limit">Sin autenticación ni permisos reales</small></div>
+        <label>Cambiar perfil<select aria-label="Perfil de demostración" aria-describedby="profile-limit" value={profile} disabled={busy} onChange={(event) => onProfileChange(event.target.value)}><option value="user">Usuario común</option><option value="admin">Secretaría / Administrador</option><option value="choose">Elegir de nuevo…</option></select></label>
       </div>
       {children}
       <footer className="workspace-footer"><span>DATOS SINTÉTICOS · PROTOTIPO LOCAL</span><span className="footer-team"><img src="/brand/quantumbyte-mark-v1.png" alt="" width="20" height="20" />QuantumByte / CampusTwin AI</span></footer>

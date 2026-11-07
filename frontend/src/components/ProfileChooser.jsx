@@ -9,7 +9,7 @@ export default function ProfileChooser({ onChoose }) {
         <button type="button" className="profile-option" onClick={() => onChoose('user')}><span className="profile-option-icon user-icon" aria-hidden="true">↗</span><span className="profile-option-title">Usuario común</span><span className="profile-option-copy">Consulta disponibilidad, encuentra un ambiente y confirma tu reserva.</span><span className="profile-option-action">Entrar como usuario <span aria-hidden="true">→</span></span></button>
         <button type="button" className="profile-option admin-option" onClick={() => onChoose('admin')}><span className="profile-option-icon admin-icon" aria-hidden="true">▦</span><span className="profile-option-title">Secretaría / Administrador</span><span className="profile-option-copy">Revisa la agenda del día, localiza espacios libres y registra reservas.</span><span className="profile-option-action">Entrar a Secretaría <span aria-hidden="true">→</span></span></button>
       </div>
-      <p className="profile-demo-note">Perfiles de demostración con datos sintéticos. Puedes cambiar de vista desde el encabezado.</p>
+      <p className="profile-demo-note">Perfiles de demostración con datos sintéticos. Esta elección cambia la vista; no inicia sesión ni concede permisos reales. Puedes cambiar de perfil desde el encabezado.</p>
     </section>
     <footer className="welcome-footer">Prototipo local · ENEISOFT XVI · QuantumByte</footer>
   </main>

@@ -1,26 +1,24 @@
-# Vista de Secretaría — alcance e integración
+# Vista de Secretaría — alcance aprobado para la hackathon
 
-## Implementado en frontend
+Leonardo confirmó que se conserva la ampliación de Secretaría dentro del contrato API 1.0 existente.
 
-- Elección entre Usuario común y Secretaría / Administrador; selector siempre disponible en el encabezado.
-- La preferencia se conserva localmente. Es un perfil de demostración, no un inicio de sesión ni autorización del servidor.
-- Agenda del día: se combinan las ocho consultas existentes `GET /api/rooms?date=...&slot_id=...`.
-- Indicadores derivados exclusivamente de consultas válidas. Si falta una franja, se presenta como sin datos y los totales conocidos se señalan como parciales.
-- Lista de reservas confirmadas del día, con sala, franja y código que devuelve la API. No se inventa un solicitante.
-- Una celda disponible abre el formulario existente `POST /api/reservations` con sala y franja seleccionadas. Registrar sigue requiriendo confirmación humana.
-- Una celda reservada abre su detalle. El servidor sigue controlando las reglas de reserva.
+## Incluido
 
-## Coordinación necesaria con Leonardo
+- Agenda de las ocho franjas y las tres salas sintéticas, consultada mediante GET /api/rooms.
+- Reservas confirmadas del día, indicadores derivados de respuestas reales y filtro por sala/horario/código.
+- Registro desde una celda disponible mediante el formulario existente y POST /api/reservations, con confirmación humana.
+- Detalle de la reserva con sala, franja y código devuelto por el backend.
+- Estado físico independiente del estado administrativo; telemetría de David vigente, expirada, sin sensor o con error.
+- Selector explícitamente rotulado «Perfil de demostración» y «Sin autenticación ni permisos reales». La preferencia local solo cambia la interfaz.
 
-El backend actual solo tiene confirmaciones; no entrega solicitudes pendientes ni correos. Su usuario de demostración es fijo. Para gestionar el trabajo de recepción y aprobación hay que acordar y versionar el contrato de:
+## Fuera del alcance de esta hackathon
 
-1. Identidad del solicitante y rol administrativo validado en el backend.
-2. Registro y consulta de solicitudes: laboratorio, fecha, franja, participantes, equipamiento, solicitante y estado.
-3. Aprobación/rechazo con responsable, motivo y marcas temporales; rechazo de doble reserva validado por el servidor.
-4. Canal de respuesta o integración con correo, si entra en el alcance del equipo.
+No se implementan solicitudes pendientes, aprobaciones, rechazos, correos, autenticación ni permisos administrativos reales. No se añaden rutas ni se cambia el contrato de Leonardo.
 
-Los nombres de endpoints y esquemas nuevos deben ser acordados por el líder antes de implementarlos. No hay acciones de aprobar, rechazar o enviar correo simuladas como si estuvieran integradas.
+## Conexión local
 
-## Mensaje para el equipo
+La variable es CAMPUSTWIN_API_TARGET. Puede indicarse en el entorno de Vite o en frontend/.env.development.local, ignorado por Git. El navegador usa /api en el mismo origen; la URL de la laptop de Leonardo queda solo en la configuración local.
 
-Marco tiene lista la selección Usuario/Secretaría y una agenda administrativa basada en las ocho franjas de la API existente. Secretaría puede consultar y abrir el registro de una reserva. Para continuar con solicitudes por correo y aprobación necesitamos que Leonardo defina el contrato de solicitudes pendientes, identidad del solicitante y autorización administrativa. El selector actual cambia la interfaz de demostración; no concede permisos en el backend.
+## Revisión
+
+Ver [INTEGRATION-REPORT.md](INTEGRATION-REPORT.md) para pruebas ejecutadas, evidencia de telemetría y la reserva sintética que quedó registrada. La revisión e integración a main corresponde a Leonardo.
