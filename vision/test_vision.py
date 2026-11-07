@@ -73,21 +73,57 @@ class TestVisionModule(unittest.TestCase):
         else:
             print("\n[INFO] Cámara ocupada por el proceso de captura principal")
 
-    def test_04_telemetry_schema(self):
-        """T33/T38: Esquema y cliente HTTP de telemetría."""
+    def test_04_telemetry_schema_authorized(self):
+        """T23: Telemetría válida con token autorizado debe devolver HTTP 202."""
+        if not self.token:
+            self.skipTest("No se configuró VISION_INGEST_TOKEN en el entorno")
         client = TelemetryClient(backend_url=self.backend_url, token=self.token)
         time.sleep(1.0)
         now_z = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-        # Probar emisión válida
         success, code, body = client.send_telemetry(
             mode="live_camera",
             status="ok",
             count=1,
             observed_at=now_z,
         )
-        print(f"\n[INFO] Envío telemetría hacia {self.backend_url}: code={code}, body={body}")
-        self.assertIn(code, [202, 401, 409, 422])
+        print(f"\n[PASS] Telemetría autorizada (T23): code={code}, accepted={body.get('accepted') if body else None}")
+        self.assertEqual(code, 202, f"Se esperaba 202 Accepted pero se recibió {code}")
+        self.assertTrue(success)
+
+    def test_05_telemetry_unauthorized(self):
+        """T38: Telemetría con token inválido debe devolver estrictamente HTTP 401."""
+        client = TelemetryClient(backend_url=self.backend_url, token="token_invalido_de_prueba")
+        time.sleep(1.0)
+        now_z = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        success, code, body = client.send_telemetry(
+            mode="live_camera",
+            status="ok",
+            count=1,
+            observed_at=now_z,
+        )
+        print(f"\n[PASS] Telemetría rechazada por auth (T38): code={code}")
+        self.assertEqual(code, 401, f"Se esperaba 401 Unauthorized pero se recibió {code}")
+        self.assertFalse(success)
+
+    def test_06_telemetry_error_status(self):
+        """T33: Telemetría con status='error' y count=null debe ser aceptada con 202."""
+        if not self.token:
+            self.skipTest("No se configuró VISION_INGEST_TOKEN en el entorno")
+        client = TelemetryClient(backend_url=self.backend_url, token=self.token)
+        time.sleep(1.0)
+        now_z = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        success, code, body = client.send_telemetry(
+            mode="live_camera",
+            status="error",
+            count=None,
+            observed_at=now_z,
+        )
+        print(f"\n[PASS] Telemetría status=error aceptada (T33): code={code}")
+        self.assertEqual(code, 202, f"Se esperaba 202 Accepted pero se recibió {code}")
+        self.assertTrue(success)
 
 
 if __name__ == "__main__":

@@ -103,23 +103,37 @@ def run_pipeline():
                 continue
 
             # Inferencia YOLO en el frame actual (RTX 4060 corre en ~25ms fluidamente)
+            inference_ok = True
             try:
                 count, lat_ms, annotated = detector.count_persons(frame, return_annotated=config.show)
             except Exception as e:
-                logger.error(f"Error durante inferencia: {e}")
-                count, lat_ms, annotated = 0, 0.0, frame if config.show else None
+                logger.error(f"Error durante inferencia YOLO: {e}. Descartando conteo y marcando error.")
+                inference_ok = False
+                count = None
+                lat_ms = 0.0
+                annotated = frame if config.show else None
 
             # Envío de telemetría exactamente cada 3.0 segundos
             now = time.perf_counter()
             if now - last_telemetry_time >= config.cadence_seconds:
                 last_telemetry_time = now
-                logger.info(
-                    f"[TELEMETRIA] count={count} personas | latencia_gpu={lat_ms:.1f} ms | observed_at={observed_at}"
-                )
+                if inference_ok:
+                    status_to_send = "ok"
+                    count_to_send = count
+                    logger.info(
+                        f"[TELEMETRIA] count={count_to_send} personas | latencia_gpu={lat_ms:.1f} ms | observed_at={observed_at}"
+                    )
+                else:
+                    status_to_send = "error"
+                    count_to_send = None
+                    logger.warning(
+                        f"[TELEMETRIA ERROR] Fallo de inferencia emitido: status=error, count=null | observed_at={observed_at}"
+                    )
+
                 # Enviar de forma asíncrona para no congelar la ventana de video
                 t = threading.Thread(
                     target=async_send,
-                    args=(config.mode, "ok", count, observed_at),
+                    args=(config.mode, status_to_send, count_to_send, observed_at),
                     daemon=True,
                 )
                 t.start()
