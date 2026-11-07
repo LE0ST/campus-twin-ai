@@ -7,11 +7,11 @@ import './branding.css'
 import './admin.css'
 import ProfileChooser from './components/ProfileChooser'
 import AdminDashboard from './components/AdminDashboard'
+import { limaDate, lastAllowedDate, selectionError } from './assistantDate'
 import { readProfile, saveProfile, clearProfile, viewForProfile } from './profile'
 import { createServerClock, subscribePageLifetime } from './catalogLifetime'
 import useServerTime from './useServerTime'
 
-const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date())
 const slots = ['S09', 'S10', 'S11', 'S14', 'S15', 'S16', 'S17', 'S18']
 const pages = {
   admin: ['Panel de Secretaría', 'Organiza las reservas del laboratorio y consulta la disponibilidad de todo el día.'],
@@ -38,7 +38,9 @@ function App() {
   const [profile, setProfile] = useState(readProfile)
   const [view, setView] = useState(() => viewForProfile(readView(), readProfile()))
   const titleRef = useRef(null)
-  const [date, setDate] = useState(today)
+  const [clock, setClock] = useState(() => new Date())
+  const today = limaDate(clock)
+  const [date, setDate] = useState(() => limaDate())
   const [slot, setSlot] = useState('S14')
   const [catalog, setCatalog] = useState({ key: null, state: 'loading', rooms: [] })
   const [pageSession, setPageSession] = useState(() => ({ visible: document.visibilityState !== 'hidden', revision: 0 }))
@@ -69,6 +71,13 @@ function App() {
     setConfirmed(false)
     setProposal(null)
   }), [])
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setClock(new Date()), 30000)
+    const refreshClock = () => setClock(new Date())
+    window.addEventListener('focus', refreshClock)
+    return () => { window.clearInterval(interval); window.removeEventListener('focus', refreshClock) }
+  }, [])
 
   useEffect(() => {
     const onHashChange = () => setView(viewForProfile(readView(), profile))
@@ -143,6 +152,9 @@ function App() {
   async function suggest(event) {
     event.preventDefault()
     if (document.visibilityState === 'hidden' || !pageSession.visible || inFlight.current || !assistantText.trim()) return
+    const error = selectionError(date, slot)
+    if (error) { setStatus({ view: 'assistant', type: 'error', message: error }); return }
+
     inFlight.current = true; setBusy(true); setStatus(null); setProposal(null)
     try {
       const response = await fetch('/api/assistant/propose', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: assistantText, date, slot_id: slot }) })
@@ -156,6 +168,9 @@ function App() {
   async function reserve(event) {
     event.preventDefault()
     if (document.visibilityState === 'hidden' || !pageSession.visible || inFlight.current || !catalogReady || !compatible || !confirmed) return
+    const error = selectionError(date, slot)
+    if (error) { setStatus({ view: 'booking', type: 'error', message: error }); return }
+
     inFlight.current = true; setBusy(true); setStatus(null)
     const payload = { room_id: selectedRoom.room_id, date, slot_id: slot, attendees: people, required_equipment: [...equipment].sort(), confirmed: true }
     const fingerprint = JSON.stringify(payload)
@@ -188,7 +203,8 @@ function App() {
   return <DashboardLayout activeView={view} profile={profile} onProfileChange={changeProfile} busy={busy}>
     <main id="main-content" tabIndex="-1">
       <section className="intro"><div><h1 ref={titleRef} tabIndex="-1" id="page-title">{profile === 'admin' && view === 'booking' ? 'Registrar reserva' : pages[view][0]}</h1><p className="subhead">{profile === 'admin' && view === 'booking' ? 'Traslada una solicitud recibida a una reserva confirmada, después de revisar sus requisitos.' : pages[view][1]}</p></div></section>
-      <div className="query-toolbar" aria-label="Fecha y horario de consulta"><div className="filters"><label>Fecha<input type="date" value={date} min={today} required disabled={busy} onChange={(e) => changeDate(e.target.value)} /></label>{view !== 'admin' && <label>Bloque horario<select value={slot} disabled={busy} onChange={(e) => changeSlot(e.target.value)}>{slots.map((value) => <option key={value} value={value}>{slotLabel(value)}</option>)}</select></label>}</div><span className="query-note">{view === 'admin' ? 'Agenda completa del día · Lima (UTC−5)' : 'Hora local · Lima (UTC−5)'}</span></div>
+      <div className="query-toolbar" aria-label="Fecha y horario de consulta"><div className="filters"><label>Fecha<input type="date" value={date} min={today} max={lastAllowedDate(today)} required disabled={busy} onChange={(e) => changeDate(e.target.value)} /></label>{view !== 'admin' && <label>Bloque horario<select value={slot} disabled={busy} onChange={(e) => changeSlot(e.target.value)}>{slots.map((value) => <option key={value} value={value}>{slotLabel(value)}</option>)}</select></label>}</div><span className="query-note">{view === 'admin' ? 'Agenda completa del día · Lima (UTC−5)' : 'Hora local · Lima (UTC−5)'}</span></div>
+      {selectionError(date, slot, clock) && view !== 'admin' && <p className="inline-warning" role="status">{selectionError(date, slot, clock)}</p>}
       {status?.view === view && <div className={`status ${status.type}`} role={status.type === 'error' ? 'alert' : 'status'}>{status.message}</div>}
       {profile === 'admin' && view === 'admin' && <AdminDashboard date={date} active={pageSession.visible} sessionKey={pageSession.revision} onBook={agendaBook} onInspect={agendaInspect} />}
       {profile === 'admin' && view === 'booking' && <div className="admin-booking-context"><span>Registro desde Secretaría · demostración</span><button type="button" className="text-button" onClick={() => navigate('admin')}>← Volver a la agenda</button></div>}
