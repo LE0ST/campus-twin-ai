@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: campustwin-ai
+    runtime: docker
+    branch: codex/campustwin-render-infra
+    region: ohio
+    plan: starter
+    numInstances: 1
+    autoDeployTrigger: 'off'
+    healthCheckPath: /api/health
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    disk:
+      name: campustwin-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: CAMPUSTWIN_DB
+        value: /var/data/campustwin.db
+      - key: DEEPSEEK_MODEL
+        value: deepseek-flash
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: VISION_INGEST_TOKEN
+        sync: false
