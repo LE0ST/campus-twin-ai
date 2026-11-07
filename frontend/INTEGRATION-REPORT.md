@@ -44,7 +44,7 @@ Para comparar la expiración, la interfaz utiliza server_time de la respuesta, e
 
 Desde frontend/:
 
-- npm.cmd run test: 10 pruebas, 10 PASS. Incluyen TTL al límite de 15 s, cero detecciones, conteo positivo, error, grabación, dato inválido, perfiles y agenda parcial.
+- npm.cmd run test: 11 pruebas, 11 PASS. Incluyen TTL al límite de 15 s, cero detecciones, conteo positivo, error, grabación, dato inválido, perfiles y agenda parcial. Las 11 pruebas ya están incluidas en de36bf2; este cierre corrige el conteo del informe.
 - npm.cmd run build: PASS.
 - npm.cmd run lint: PASS.
 - git diff --check: PASS.
@@ -61,3 +61,40 @@ Los tests automáticos usan respuestas sintéticas aisladas; las observaciones d
 - Consola del navegador sin errores de JavaScript ni CORS en el flujo revisado.
 - A 320 px, el ancho de contenido y el ancho útil coincidieron (305 px con barra vertical); no hubo desbordamiento horizontal.
 - El texto visible junto al selector dice «Perfil de demostración» y «Sin autenticación ni permisos reales».
+
+## Cierre de T28 y T30 con David y Leonardo
+
+Pruebas realizadas el 7 de noviembre de 2026. Horas locales de Lima (UTC−5). Se consultó el backend real mediante el proxy del frontend; no se capturaron ni guardaron imágenes de la cámara.
+
+### T28 — detección positiva y cero detecciones: PASS
+
+| Consulta del servidor (UTC) | Observación (Lima) | Estado de R01 | Conteo |
+| --- | --- | --- | --- |
+| 15:45:30.998690Z | 10:45:28 | people_detected | 1 |
+| 15:46:40.343122Z | 10:46:38 | no_detections | 0 |
+
+La interfaz mostró primero «1 persona detectada» y después «Sin personas detectadas» / «Sin detecciones». No se presentó el cero como prueba de que el ambiente estuviera vacío. Fuente vision-david, modo live_camera.
+
+### T30 — emisor detenido y lectura vencida: PASS
+
+Marco confirmó que David detuvo el emisor. La consulta del servidor a las 15:50:08.038342Z devolvió para R01:
+
+- state: unknown; reason: stale; count: null.
+- observed_at: 2026-11-07T15:48:48Z (10:48:48 de Lima).
+- received_at: 2026-11-07T15:48:49.506952Z.
+- expires_at: 2026-11-07T15:49:03Z (10:49:03 de Lima), 15 segundos después de observed_at.
+
+El frontend mostró «Lectura vencida», «Ocupación desconocida» y «La última lectura venció. Esperando una nueva medición». No mostró cero como sustituto de una lectura vencida. Se comprobó el estado posterior al vencimiento; no se midió el instante exacto de la transición en pantalla.
+
+Se compararon los 24 cruces de tres ambientes y ocho franjas antes y después: estados administrativos e identificadores sin cambios. Permanecieron las reservas confirmadas:
+
+- R01/S14: 8589a939-c97d-4956-be31-283701ec963a.
+- R03/S17: be99439e-f7bb-4024-bd0c-652afa8f8647.
+
+Leonardo confirmó adicionalmente la visualización independiente de «Reservada» y el conteo real en R01. Las consultas de T28/T30 descritas arriba se hicieron en S18, disponible; la comparación de reservas incluyó también S14. No se crearon ni modificaron reservas durante estas dos pruebas.
+
+### Verificación para integrar y alcance congelado
+
+Reejecutados npm.cmd test (11/11 PASS), npm.cmd run build y npm.cmd run lint para este cierre. El cambio de cierre solo actualiza este informe; mantiene el código y las 11 pruebas del commit de36bf2. No añade funcionalidades ni cambia el backend, el contrato API o el perfil de demostración.
+
+T28/T30 verifican el flujo con consultas periódicas activas. No certifican T31/T53: siguen pendientes la caducidad independiente cuando se bloquea el polling y la invalidación inmediata al volver de una pestaña suspendida. El tiempo utilizado por la presentación se actualiza con cada respuesta del catálogo; no hay un temporizador monotónico independiente ni un manejador visibilitychange. Esta limitación debe mantenerse visible en la revisión de estabilidad.
