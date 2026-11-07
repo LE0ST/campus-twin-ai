@@ -1,0 +1,18 @@
+# Ignore Python environments and caches
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.env
+
+# Ignore weights and videos
+*.pt
+*.onnx
+*.engine
+*.mp4
+*.avi
+*.mkv
+*.mov
+
+# Ignore local logs or dumps
+*.log
