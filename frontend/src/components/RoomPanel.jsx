@@ -39,7 +39,7 @@ export function RoomDetail({ room, slot, onBook, actionLabel = 'Ver disponibilid
 export function SummaryCards({ rooms, ready, now }) {
   const monitored = rooms.filter((room) => occupancyInfo(room, now).known).length
   const data = [
-    { label: 'Ambientes del piloto', value: rooms.length, note: 'Espacios sintéticos', icon: '▦', color: 'blue' },
+    { label: 'Ambientes del piloto', value: rooms.length, note: 'Ambientes ficticios de demostración', icon: '▦', color: 'blue' },
     { label: 'Reservas en esta franja', value: rooms.filter((room) => room.reservation_state === 'reserved').length, note: 'Estado administrativo', icon: '▣', color: 'green' },
     { label: 'Ambientes con lectura vigente', value: monitored, note: 'Ocupación física observada', icon: '◉', color: 'amber' },
   ]
