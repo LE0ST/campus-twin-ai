@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react'
 import { AGENDA_SLOTS, ROOM_IDS, fetchAgenda, summarizeAgenda } from '../agenda'
 import { localDateLabel, slotLabel } from '../roomPresentation'
 
-export default function AdminDashboard({ date, onBook, onInspect }) {
+export default function AdminDashboard({ date, active = true, sessionKey = 0, onBook, onInspect }) {
   const [reload, setReload] = useState(0)
   const [agenda, setAgenda] = useState({ key: null, rows: [] })
   const [filter, setFilter] = useState('')
-  const key = `${date}/${reload}`
-  const ready = agenda.key === key
+  const key = `${date}/${reload}/${sessionKey}`
+  const ready = active && agenda.key === key
   const rows = ready ? agenda.rows : []
   const summary = summarizeAgenda(rows)
   const count = (value) => !ready || !summary.consulted ? '—' : `${summary.partial ? '≥ ' : ''}${String(value).padStart(2, '0')}`
@@ -15,17 +15,18 @@ export default function AdminDashboard({ date, onBook, onInspect }) {
   const roomNames = Object.fromEntries(rows.flatMap((row) => row.rooms.map((room) => [room.room_id, room.name])))
 
   useEffect(() => {
-    let active = true
+    if (!active) return
+    let mounted = true
     const controller = new AbortController()
     const timeout = window.setTimeout(() => controller.abort(), 12000)
     fetchAgenda(date, controller.signal).then((result) => {
-      if (active) setAgenda({ key, rows: result })
+      if (mounted) setAgenda({ key, rows: result })
     }).finally(() => window.clearTimeout(timeout))
-    return () => { active = false; controller.abort(); window.clearTimeout(timeout) }
-  }, [date, key])
+    return () => { mounted = false; controller.abort(); window.clearTimeout(timeout) }
+  }, [date, key, active])
 
   return <div className="admin-dashboard">
-    <section className="admin-intro-card"><div><span className="admin-kicker">ESPACIO DE SECRETARÍA</span><h2>La agenda, en un solo vistazo.</h2><p>Revisa los horarios antes de responder una solicitud y registra la reserva cuando los datos estén confirmados.</p></div><button type="button" className="primary-button" onClick={() => onBook()}>Registrar una reserva <span aria-hidden="true">+</span></button></section>
+    <section className="admin-intro-card"><div><span className="admin-kicker">SECRETARÍA · PERFIL DE DEMOSTRACIÓN</span><h2>La agenda, en un solo vistazo.</h2><p>Sin autenticación real ni permisos administrativos. Las reservas son registros de demostración, no institucionales.</p></div><button type="button" className="primary-button" onClick={() => onBook()}>Registrar una reserva <span aria-hidden="true">+</span></button></section>
     <section className="summary-grid" aria-label="Resumen administrativo del día">
       <article className="summary-card"><span className="summary-icon blue" aria-hidden="true">▣</span><div><p>Reservas registradas</p><strong>{count(summary.reservations.length)}</strong><small>Para la fecha seleccionada</small></div></article>
       <article className="summary-card"><span className="summary-icon green" aria-hidden="true">◷</span><div><p>Espacios por reservar</p><strong>{count(summary.available)}</strong><small>Combinaciones de sala y franja</small></div></article>

@@ -120,6 +120,8 @@ class AssistantIn(StrictModel):
     @classmethod
     def valid_date_syntax(cls, value: str) -> str:
         try:
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+                raise ValueError("formato inválido")
             return date.fromisoformat(value).isoformat()
         except ValueError as exc:
             raise ValueError("date debe usar YYYY-MM-DD") from exc
@@ -265,9 +267,17 @@ async def api_error_handler(_: Request, exc: APIError):
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_error_handler(_: Request, exc: RequestValidationError):
+async def validation_error_handler(request: Request, exc: RequestValidationError):
     fields = sorted({".".join(str(p) for p in item["loc"] if p != "body") for item in exc.errors()})
-    return JSONResponse(status_code=422, content=error_body("invalid_request", "La solicitud no cumple el contrato.", fields))
+    message = "La solicitud no cumple el contrato."
+    if request.url.path == "/api/assistant/propose":
+        if "date" in fields:
+            message = "La fecha debe ser válida y usar YYYY-MM-DD."
+        elif "slot_id" in fields:
+            message = "La franja indicada no existe."
+        elif "text" in fields:
+            message = "Escribe una solicitud de entre 1 y 500 caracteres."
+    return JSONResponse(status_code=422, content=error_body("invalid_request", message, fields))
 
 
 @app.get("/api/health")
@@ -419,28 +429,114 @@ PROPOSAL_SCHEMA = {**SEARCH_SCHEMA,
     "required": [*SEARCH_SCHEMA["required"], "room_id"]}
 
 
+# Only explicit counts tied to people are accepted; unrelated numbers cannot imply attendance.
+COUNT_WORDS = {"un": 1, "una": 1, "uno": 1, "dos": 2, "tres": 3, "cuatro": 4,
+    "cinco": 5, "seis": 6, "siete": 7, "ocho": 8, "nueve": 9, "diez": 10,
+    "once": 11, "doce": 12, "trece": 13, "catorce": 14, "quince": 15,
+    "dieciséis": 16, "dieciseis": 16, "veinte": 20}
+COUNT_PATTERN = r"(?:\d+|" + "|".join(COUNT_WORDS) + r")"
+PEOPLE_PATTERN = r"(?:personas?|estudiantes?|asistentes?|participantes?|alumnos?)"
+
+
+def assistant_attendees(text: str) -> int | None:
+    matches = list(re.finditer(rf"(?<![\w:])({COUNT_PATTERN})\s+{PEOPLE_PATTERN}\b", text, re.IGNORECASE))
+    # More than one count, including a range such as '6 o 8 personas', is ambiguous.
+    if len(matches) != 1:
+        return None
+    token = matches[0].group(1).lower()
+    prefix = text[:matches[0].start()]
+    suffix = text[matches[0].end():]
+    if (re.search(r"(?:[\d.,+\-]|\b(?:y|aproximadamente|unos|unas|entre|más de|menos de))\s*$", prefix, re.IGNORECASE)
+            or re.search(rf"(?<![\w:]){COUNT_PATTERN}\s*(?:o|u|a|[-–])\s*$", prefix, re.IGNORECASE)
+            or re.match(rf"\s*(?:o|u|a|[-–])\s*{COUNT_PATTERN}\b", suffix, re.IGNORECASE)):
+        return None
+    count = int(token) if token.isdigit() else COUNT_WORDS[token]
+    return count if 1 <= count <= 100 else None
+
+
+EQUIPMENT_ALIASES = {
+    "pc": r"\b(?:pcs?|computador(?:a|as|es)?|ordenador(?:a|as|es)?)\b",
+    "projector": r"\b(?:proyector(?:es)?|projectors?)\b",
+    "whiteboard": r"\b(?:pizarras?|whiteboards?)\b",
+    "wifi": r"\bwi[ -]?fi\b",
+}
+
+
+def explicit_constraints(text: str, day: date, slot_id: str) -> tuple[str | None, set[str], str | None]:
+    if re.search(r"\b(?:dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|[2-9]\d*)\s+(?:salas?|ambientes?|espacios?)\b|\b(?:salas|ambientes)\b", text, re.I):
+        return None, set(), "El flujo actual propone una sola sala por solicitud. Solicita cada sala por separado."
+    # Bind exclusion language to a room mention; a conversational "No," is separate.
+    room_reference = r"(?:(?:la\s+)?(?:sala|ambiente)\s+)?R\d+\b"
+    excluded_room = re.search(
+        rf"\b(?:no\s+(?:(?:quiero|deseo|necesito|prefiero|reservar|uses|usar|elijas|selecciones)\s+)?|"
+        rf"(?:excepto|menos|salvo|evita|evitar|excluye|excluir|descarta|descartar)\s+){room_reference}",
+        text, re.I)
+    if excluded_room or re.search(r"\bR\d+\s+(?:no\b|queda\s+excluid[oa]\b)", text, re.I):
+        return None, set(), "El asistente todavía no admite excluir salas mediante texto libre. Reformula la búsqueda indicando una sala deseada o sin exclusiones."
+    rooms = set(re.findall(r"\bR\d+\b", text, re.I))
+    rooms = {room.upper() for room in rooms}
+    if len(rooms) > 1 or (rooms and not rooms.issubset(ROOM_IDS)):
+        return None, set(), "Indica una sola sala existente."
+    room = next(iter(rooms), None)
+    # The selected date is authoritative; dates written in text need explicit confirmation.
+    if re.search(r"\b(?:\d{1,4}[-/]\d{1,2}(?:[-/]\d{1,4})?|\d{1,2}\s+de\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)|hoy|mañana|pasado mañana|lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)\b", text, re.I):
+        return room, set(), "Comprueba la fecha escrita y ajusta el selector de fecha; evita repetirla en el texto."
+    times = re.findall(r"(?<!\d)(\d{1,2}):(\d{2})(?!\d)", text)
+    if times:
+        expected_start, expected_end = SLOTS[slot_id]
+        try:
+            parsed = [time(int(h), int(m)) for h, m in times]
+        except ValueError:
+            return room, set(), "La hora indicada no es válida."
+        interval = re.search(r"\b\d{1,2}:\d{2}\s*(?:a|hasta|[-–])\s*(?:las\s+)?\d{1,2}:\d{2}\b", text, re.I)
+        if parsed != [expected_start] and not (parsed == [expected_start, expected_end] and interval):
+            return room, set(), "La hora escrita no coincide con la franja seleccionada o excede una franja; ajusta el selector."
+    elif re.search(r"\b(?:a las|desde las|hasta las)\s+\d", text, re.I):
+        return room, set(), "Indica la hora con formato HH:MM y selecciona una franja compatible."
+    required = {key for key, pattern in EQUIPMENT_ALIASES.items() if re.search(pattern, text, re.I)}
+    if required and re.search(r"\b(?:sin|no|opcional(?:es)?|opcionalmente|preferib(?:le|lemente)|si es posible|o|u|alternativa(?:s)?)\b", text, re.I):
+        return room, required, "Aclara qué equipos son obligatorios, sin negaciones ni alternativas."
+    return room, required, None
+
+
+def clarification(message: str) -> dict:
+    return {"status": "needs_clarification", "message": message, "proposal": None, "tool_trace": []}
+
+
 @app.post("/api/assistant/propose")
 def propose(payload: AssistantIn):
+    day = date.fromisoformat(payload.date)
+    if not date_allowed(day):
+        raise APIError(422, "invalid_date", "La fecha debe estar entre hoy y los próximos 7 días.", ["date"])
+    if not slot_not_started(day, payload.slot_id):
+        raise APIError(422, "invalid_slot", "La franja ya comenzó; elige otra.", ["slot_id"])
+    if re.search(r"(?:[¿]\s*)?\b(?:qué|cuál|cuáles|cuánto|cuánta|cuántos|cuántas|cómo|dime|información|informacion)\b", payload.text, re.IGNORECASE):
+        return clarification("Las consultas informativas aún no están disponibles en el asistente; revisa el catálogo de salas.")
+    room, explicit_equipment, issue = explicit_constraints(payload.text, day, payload.slot_id)
+    if issue:
+        return clarification(issue)
+    attendees = assistant_attendees(payload.text)
+    if attendees is None:
+        return clarification("Indica una cantidad única de asistentes entre 1 y 100, por ejemplo: 6 personas.")
     if not os.getenv("DEEPSEEK_API_KEY"):
         raise APIError(503, "assistant_unavailable", "Asistente sin configurar; usa el formulario.")
-    match = re.search(r"(?<!\d)(\d{1,3})(?!\d)", payload.text)
-    if not match:
-        return {"status": "needs_clarification", "message": "Indica cuántas personas asistirán.",
-                "proposal": None, "tool_trace": []}
-    attendees = int(match.group(1))
     try:
         raw = deepseek.call_tool("search_rooms", SEARCH_SCHEMA,
             f"Solicitud: {payload.text}\nFecha: {payload.date}; franja: {payload.slot_id}; asistentes: {attendees}. "
             "Equipos permitidos: pc, projector, whiteboard, wifi. No inventes requisitos.")
         search = SearchArgs.model_validate(raw)
         required = search.required_equipment
+        if set(required) != explicit_equipment:
+            return clarification("No se pudieron verificar los equipos solicitados. Reformula los requisitos e inténtalo de nuevo.")
         if (search.date != payload.date or search.slot_id != payload.slot_id
                 or search.attendees != attendees or len(required) != len(set(required))
                 or not set(required).issubset(EQUIPMENT)):
             raise ValueError("invalid search")
         candidates = room_candidates(payload.date, payload.slot_id, attendees, required)
+        if room:
+            candidates = [candidate for candidate in candidates if candidate["room_id"] == room]
         if not candidates:
-            return {"status": "no_match", "message": "No hay una sala compatible para esa franja.",
+            return {"status": "no_match", "message": f"No hay coincidencias para {room} en esa franja." if room else "No hay una sala compatible para esa franja.",
                     "proposal": None, "tool_trace": ["search_rooms"]}
         raw_proposal = deepseek.call_tool("propose_reservation", PROPOSAL_SCHEMA,
             "Selecciona y copia exactamente una candidata validada: " + json.dumps(candidates))

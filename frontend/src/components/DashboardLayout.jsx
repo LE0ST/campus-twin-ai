@@ -44,7 +44,7 @@ export default function DashboardLayout({ children, activeView, profile, onProfi
         </div>
         <div className="sidebar-note">
           <span className="demo-badge">MODO DEMOSTRACIÓN</span>
-          <p>Ambientes y datos sintéticos.<br />No representan datos de la UNMSM.</p>
+          <p>Catálogo y ambientes ficticios.<br />Reservas de demostración.</p>
         </div>
         <div className="sidebar-footer"><span className="sidebar-status-dot" />Prototipo · ENEISOFT XVI</div>
       </div>
@@ -55,16 +55,18 @@ export default function DashboardLayout({ children, activeView, profile, onProfi
         <div className="workspace-label"><strong>CampusTwin AI</strong><span>/</span><span>Gestión de espacios</span></div>
         <div className="topbar-actions">
           <span className="header-badge">DEMOSTRACIÓN</span>
-          <div className="university-brand" title="Universidad Nacional Mayor de San Marcos"><img src="/brand/san-marcos-official.svg" alt="Universidad Nacional Mayor de San Marcos" width="151" height="40" /></div>
+
           <div className="header-team"><span className="team-avatar"><img src="/brand/quantumbyte-mark-v1.png" alt="Logo de QuantumByte" width="34" height="34" /></span><span className="team-name">QuantumByte<small>CampusTwin AI</small></span></div>
         </div>
       </header>
       <div className={`profile-bar ${isAdmin ? 'admin-profile' : ''}`}>
-        <div><span className="profile-view-label">{isAdmin ? 'Vista de Secretaría' : 'Vista de usuario'}</span><span className="profile-scope">Perfil de demostración</span><small className="profile-notice" id="profile-limit">Sin autenticación ni permisos reales</small></div>
+        <div><span className="profile-view-label">{isAdmin ? 'Vista de Secretaría' : 'Vista de usuario'}</span><span className="profile-scope">Perfil de demostración</span><small className="profile-notice" id="profile-limit">Sin autenticación ni permisos administrativos reales; las reservas no son registros institucionales.</small></div>
         <label>Cambiar perfil<select aria-label="Perfil de demostración" aria-describedby="profile-limit" value={profile} disabled={busy} onChange={(event) => onProfileChange(event.target.value)}><option value="user">Usuario común</option><option value="admin">Secretaría / Administrador</option><option value="choose">Elegir de nuevo…</option></select></label>
       </div>
+      <p className="independence-notice">Prototipo académico independiente de QuantumByte. CampusTwin AI no constituye una plataforma oficial ni un canal de reservas institucional de la Universidad Nacional Mayor de San Marcos.</p>
+      <p className="data-notice">Catálogo y ambientes ficticios; reservas de demostración. La ocupación física puede proceder de telemetría experimental del sensor; las grabaciones son muestras registradas.</p>
       {children}
-      <footer className="workspace-footer"><span>DATOS SINTÉTICOS · PROTOTIPO LOCAL</span><span className="footer-team"><img src="/brand/quantumbyte-mark-v1.png" alt="" width="20" height="20" />QuantumByte / CampusTwin AI</span></footer>
+      <footer className="workspace-footer"><span>CATÁLOGO FICTICIO · RESERVAS DE DEMOSTRACIÓN</span><span className="footer-team"><img src="/brand/quantumbyte-mark-v1.png" alt="" width="20" height="20" />QuantumByte / CampusTwin AI</span></footer>
     </div>
   </div>
 }
