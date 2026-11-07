@@ -1,8 +1,12 @@
 import logging
+import os
 import signal
 import sys
 import time
 from datetime import datetime, timezone
+
+# Asegurar que la carpeta vision/ esté en sys.path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import parse_args
 from camera import VideoSource

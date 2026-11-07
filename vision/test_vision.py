@@ -1,8 +1,12 @@
 import os
+import sys
 import time
 import unittest
 from datetime import datetime, timezone
 import numpy as np
+
+# Asegurar que la carpeta vision/ esté en sys.path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from detector import PersonDetector
 from camera import VideoSource
