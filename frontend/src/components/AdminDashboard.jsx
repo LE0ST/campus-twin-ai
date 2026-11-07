@@ -26,7 +26,7 @@ export default function AdminDashboard({ date, active = true, sessionKey = 0, on
   }, [date, key, active])
 
   return <div className="admin-dashboard">
-    <section className="admin-intro-card"><div><span className="admin-kicker">ESPACIO DE SECRETARÍA</span><h2>La agenda, en un solo vistazo.</h2><p>Revisa los horarios antes de responder una solicitud y registra la reserva cuando los datos estén confirmados.</p></div><button type="button" className="primary-button" onClick={() => onBook()}>Registrar una reserva <span aria-hidden="true">+</span></button></section>
+    <section className="admin-intro-card"><div><span className="admin-kicker">SECRETARÍA · PERFIL DE DEMOSTRACIÓN</span><h2>La agenda, en un solo vistazo.</h2><p>Sin autenticación real ni permisos administrativos. Las reservas son registros de demostración, no institucionales.</p></div><button type="button" className="primary-button" onClick={() => onBook()}>Registrar una reserva <span aria-hidden="true">+</span></button></section>
     <section className="summary-grid" aria-label="Resumen administrativo del día">
       <article className="summary-card"><span className="summary-icon blue" aria-hidden="true">▣</span><div><p>Reservas registradas</p><strong>{count(summary.reservations.length)}</strong><small>Para la fecha seleccionada</small></div></article>
       <article className="summary-card"><span className="summary-icon green" aria-hidden="true">◷</span><div><p>Espacios por reservar</p><strong>{count(summary.available)}</strong><small>Combinaciones de sala y franja</small></div></article>
