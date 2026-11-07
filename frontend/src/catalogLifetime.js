@@ -14,6 +14,35 @@ export function serverTimeAt(clock, monotonicNow) {
   return clock.serverAt + monotonicNow - clock.receivedAt
 }
 
+// Each catalog owns its deadlines and its timers. A disposed catalog cannot publish.
+export function scheduleOccupancyDeadlines(clock, rooms, timer, publish) {
+  let active = true
+  const handles = new Set()
+  const update = () => { if (active) publish(timer.now()) }
+  update()
+  for (const room of rooms || []) {
+    const sample = room?.occupancy
+    const expires = Date.parse(sample?.expires_at)
+    if (sample?.mode !== 'live_camera' || !Number.isFinite(expires) ||
+        !Number.isFinite(clock?.serverAt) || !Number.isFinite(clock?.receivedAt)) continue
+    const deadline = clock.receivedAt + expires - clock.serverAt
+    const schedule = () => {
+      if (!active) return
+      const remaining = deadline - timer.now()
+      if (remaining <= 0) { update(); return }
+      const handle = timer.setTimeout(() => {
+        handles.delete(handle)
+        if (!active) return
+        update()
+        schedule() // A timer may fire before its deadline.
+      }, Math.min(Math.ceil(remaining), 2147483647))
+      handles.add(handle)
+    }
+    schedule()
+  }
+  return () => { active = false; for (const handle of handles) timer.clearTimeout(handle); handles.clear() }
+}
+
 export function subscribePageLifetime(page, host, invalidate) {
   const visibility = () => invalidate(page.visibilityState !== 'hidden')
   const freeze = () => invalidate(false)

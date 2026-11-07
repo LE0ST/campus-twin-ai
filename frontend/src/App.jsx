@@ -42,7 +42,7 @@ function App() {
   const [slot, setSlot] = useState('S14')
   const [catalog, setCatalog] = useState({ key: null, state: 'loading', rooms: [] })
   const [pageSession, setPageSession] = useState(() => ({ visible: document.visibilityState !== 'hidden', revision: 0 }))
-  const catalogNow = useServerTime(catalog.clock)
+  const catalogNow = useServerTime(catalog.clock, catalog.rooms)
   const [reloadCount, setReloadCount] = useState(0)
   const [selectedId, setSelectedId] = useState('R01')
   const [people, setPeople] = useState(2)
