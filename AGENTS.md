@@ -10,6 +10,7 @@ El líder autorizó la ejecución durante ENEISOFT XVI el 7 de noviembre de 2026
 - Sin reconocimiento facial, identificación individual, captura encubierta ni almacenamiento de imágenes.
 - `no_detections` no prueba ausencia. Dato ausente, expirado o fallo de cámara significa `unknown`.
 - El LLM no obtiene SQL, shell, URL arbitraria ni herramientas de escritura.
+- Proveedor del asistente: DeepSeek Flash mediante el SDK Python `openai` (licencia Apache-2.0); sus herramientas solo proponen y consultan.
 
 ## Propiedad y cambios
 
