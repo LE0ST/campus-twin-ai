@@ -1,0 +1,17 @@
+# Render Free: intentionally ephemeral SQLite, no disk and no paid resources.
+services:
+  - type: web
+    name: campustwin-ai-demo
+    runtime: docker
+    plan: free
+    region: ohio
+    branch: deploy/render-free-2026-11-07
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeployTrigger: off
+    envVars:
+      - key: CAMPUSTWIN_DB
+        value: /tmp/campustwin-demo.db
+      - key: DEEPSEEK_MODEL
+        value: deepseek-flash
