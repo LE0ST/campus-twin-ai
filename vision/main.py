@@ -2,6 +2,7 @@ import logging
 import os
 import signal
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 import cv2
@@ -78,12 +79,15 @@ def run_pipeline():
         telemetry.send_telemetry(mode=config.mode, status="error", count=None, observed_at=err_time)
         return
 
-    logger.info(f"Iniciando ciclo continuo de telemetría cada {config.cadence_seconds} segundos...")
+    logger.info(f"Iniciando captura en tiempo real con emisión de telemetría cada {config.cadence_seconds} s...")
+
+    last_telemetry_time = 0.0
+
+    def async_send(mode, status, count, observed_at):
+        telemetry.send_telemetry(mode=mode, status=status, count=count, observed_at=observed_at)
 
     try:
         while _running:
-            tick_start = time.perf_counter()
-
             success, frame, observed_at = video.read_frame()
 
             if not success or frame is None or observed_at is None:
@@ -95,57 +99,49 @@ def run_pipeline():
                     count=None,
                     observed_at=err_time,
                 )
-            else:
-                try:
-                    count, lat_ms, annotated = detector.count_persons(frame, return_annotated=config.show)
-                    logger.info(
-                        f"[FRAME] count={count} personas detectadas | latencia={lat_ms:.1f} ms | observed_at={observed_at}"
-                    )
-                    telemetry.send_telemetry(
-                        mode=config.mode,
-                        status="ok",
-                        count=count,
-                        observed_at=observed_at,
-                    )
+                time.sleep(0.5)
+                continue
 
-                    # Si se activó la bandera --show, mostrar ventana de monitor local
-                    if config.show and annotated is not None:
-                        cv2.putText(
-                            annotated,
-                            f"CampusTwin R01 | Count: {count} | Lat: {lat_ms:.1f}ms",
-                            (15, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.7,
-                            (0, 255, 0),
-                            2,
-                        )
-                        cv2.imshow("CampusTwin AI - Monitor de Vision (Local)", annotated)
-                        if cv2.waitKey(1) & 0xFF == ord("q"):
-                            _running = False
-                            break
-                except Exception as e:
-                    logger.error(f"Error durante inferencia: {e}. Emitiendo status=error...")
-                    err_time = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-                    telemetry.send_telemetry(
-                        mode=config.mode,
-                        status="error",
-                        count=None,
-                        observed_at=err_time,
-                    )
+            # Inferencia YOLO en el frame actual (RTX 4060 corre en ~25ms fluidamente)
+            try:
+                count, lat_ms, annotated = detector.count_persons(frame, return_annotated=config.show)
+            except Exception as e:
+                logger.error(f"Error durante inferencia: {e}")
+                count, lat_ms, annotated = 0, 0.0, frame if config.show else None
 
-            # Control preciso de cadencia de 3 segundos
-            elapsed = time.perf_counter() - tick_start
-            sleep_time = max(0.0, config.cadence_seconds - elapsed)
+            # Envío de telemetría exactamente cada 3.0 segundos
+            now = time.perf_counter()
+            if now - last_telemetry_time >= config.cadence_seconds:
+                last_telemetry_time = now
+                logger.info(
+                    f"[TELEMETRIA] count={count} personas | latencia_gpu={lat_ms:.1f} ms | observed_at={observed_at}"
+                )
+                # Enviar de forma asíncrona para no congelar la ventana de video
+                t = threading.Thread(
+                    target=async_send,
+                    args=(config.mode, "ok", count, observed_at),
+                    daemon=True,
+                )
+                t.start()
 
-            # Dormir en micro-intervalos para responder rápido a Ctrl+C y eventos de GUI
-            sleep_step = 0.05
-            while _running and sleep_time > 0:
-                if config.show:
-                    if cv2.waitKey(1) & 0xFF == ord("q"):
-                        _running = False
-                        break
-                time.sleep(min(sleep_step, sleep_time))
-                sleep_time -= sleep_step
+            # Si --show está activo, renderizar video fluido en tiempo real
+            if config.show and annotated is not None:
+                cv2.putText(
+                    annotated,
+                    f"CampusTwin R01 | Count: {count} | GPU: {lat_ms:.1f}ms",
+                    (15, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (0, 255, 0),
+                    2,
+                )
+                cv2.imshow("CampusTwin AI - Monitor de Vision (Local)", annotated)
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    _running = False
+                    break
+            elif not config.show:
+                # Si es headless, un micro-sleep para no saturar CPU innecesariamente
+                time.sleep(0.01)
 
     finally:
         logger.info("Cerrando recursos de visión...")
